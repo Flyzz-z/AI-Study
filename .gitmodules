@@ -1,0 +1,3 @@
+[submodule "AI-ZeroToOne"]
+	path = AI-ZeroToOne
+	url = git@github.com:Flyzz-z/AI-ZeroToOne.git
