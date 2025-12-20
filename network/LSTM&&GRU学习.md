@@ -48,6 +48,52 @@
   - $z_t$ 像“融合旋钮”，决定保留多少旧记忆、写入多少新内容
   - 加性更新避免纯替换，提升训练稳定性并缓解梯度消失
 
+## 多层RNN和双向RNN
+
+### 1. 多层 RNN (Stacked RNN)
+
+- **概念**：将多个 RNN 层（GRU/LSTM）纵向堆叠，**上一层的输出（Output）作为下一层的输入**。
+- **目的**：提取更抽象、更高阶的特征（类似于深层 CNN）。
+- **参数控制**：`num_layers`（如设置为 2，表示 2 层堆叠）。
+- **Dropout**：当 `num_layers > 1` 时，`dropout` 参数会在层与层之间生效，防止过拟合。
+- **示意图**：
+  ```
+  Layer 2 Output: [h2_1, h2_2, ..., h2_t] -> Final Output
+        ↑
+  Layer 1 Output: [h1_1, h1_2, ..., h1_t] -> Layer 2 Input
+        ↑
+  Input Sequence: [x_1,  x_2,  ..., x_t]
+  ```
+
+### 2. 双向 RNN (Bidirectional RNN)
+
+- **概念**：同时训练两个独立的 RNN，一个按**正向顺序**（$x_1 \to x_t$）处理，另一个按**反向顺序**（$x_t \to x_1$）处理。
+- **目的**：让模型在时刻 $t$ 不仅能看到“过去”的信息，还能看到“未来”的信息（适用于翻译、完形填空等全序列可见任务）。
+- **参数控制**：`bidirectional=True`。
+- **维度变化**：
+  - **Output**：形状变为 `[Batch, Seq_Len, Hidden_Dim * 2]`（每个时刻 $t$ 包含正向 $h_t^{\to}$ 和反向 $h_t^{\leftarrow}$ 的拼接）。
+  - **Hidden**：形状变为 `[Num_Layers * 2, Batch, Hidden_Dim]`（包含每层的前向和后向最终状态）。
+- **示意图**：
+  ```
+  Forward:  x_1 → x_2 → ... → x_t  ⇒ h_forward
+  Backward: x_1 ← x_2 ← ... ← x_t  ⇒ h_backward
+  Output_t = Concat(h_forward_t, h_backward_t)
+  ```
+
+### 3. Output 与 Hidden 的区别（常见误区）
+
+- **Output (`outputs`)**
+  - **形状**：`[Batch, Seq_Len, Hidden_Dim (* 2 if bidirectional)]`
+  - **含义**：**最顶层**在**所有时间步**的隐藏状态序列。
+  - **用途**：用于**逐词预测**（如序列标注、翻译中的 Attention 机制）。
+
+- **Hidden State (`hidden`)**
+  - **形状**：`[Num_Layers (* 2), Batch, Hidden_Dim]`
+  - **含义**：**每一层**在**最后一个时间步**的隐藏状态汇总。
+  - **用途**：用于**句子级表示**（如文本分类、Seq2Seq 解码器初始化）。
+
+> **总结**：`Output` 是时间维度展开的特征流（用于过程），`Hidden` 是深度维度汇总的最终记忆（用于结果）。
+
 ## 语言模型
 
 基于 GRU 的语言模型实现流程（参考 rnn.ipynb）：
