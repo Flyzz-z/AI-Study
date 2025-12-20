@@ -131,3 +131,103 @@
      - **Top-K**：过滤掉低概率词，保留高概率候选。
      - **Multinomial Sampling**：根据概率分布随机抽取下一个词，增加多样性。
    - **循环**：将生成的词追加到输入序列，重复上述步骤生成后续文本。
+  
+
+## RNN + Attention
+
+### 核心思想
+
+**注意力机制**：让解码器在生成每个目标词时，能够"关注"源序列中最相关的信息，而不是只依赖于固定长度的上下文向量。
+
+### 注意力计算流程
+
+#### 1. QKV 准备阶段
+
+```python
+# Q: 从解码器当前隐状态生成查询向量
+Q = self.W_q(decoder_hidden).unsqueeze(1)  # [batch_size, 1, hidden_size]
+
+# K, V: 从编码器所有输出生成键和值
+K = self.W_k(encoder_outputs)  # [batch_size, seq_len, hidden_size]  
+V = self.W_v(encoder_outputs)  # [batch_size, seq_len, hidden_size]
+```
+
+**Q (Query)**：解码器当前状态的查询表示
+**K (Key)**：编码器各时间步的特征表示  
+**V (Value)**：编码器各时间步的实际信息
+
+#### 2. 注意力分数计算
+
+```python
+# 计算相似度得分
+scores = torch.bmm(Q, K.transpose(1, 2)) / math.sqrt(self.hidden_size)
+# scores: [batch_size, 1, seq_len]
+```
+
+**计算过程**：
+1. Q与K的点积：`Q × K^T` → 相似度矩阵
+2. 缩放因子：`÷ sqrt(hidden_size)` → 防止梯度消失
+3. 结果：每个查询与所有键的相似度得分
+
+#### 3. 注意力权重归一化
+
+```python
+attention_weights = F.softmax(scores, dim=-1)  # [batch_size, 1, seq_len]
+```
+
+**Softmax 归一化**：将相似度得分转换为概率分布（0-1之间，和为1）
+
+#### 4. 上下文向量计算
+
+```python
+context = torch.bmm(attention_weights, V).squeeze(1)  # [batch_size, hidden_size]
+```
+
+**加权求和**：根据注意力权重对值向量 V 进行加权平均，得到上下文信息
+
+### 在 Seq2Seq 中的应用流程
+
+#### 1. 训练阶段（Teacher Forcing）
+
+```
+编码器：完整源序列 → 所有时间步的编码输出
+     ↓
+解码器：每个时间步
+     ↓
+注意力：计算当前解码状态与编码器所有输出的相关性
+     ↓  
+上下文：加权融合最相关的编码信息
+     ↓
+GRU：结合上下文和当前输入token生成下一个隐状态
+     ↓
+预测：输出下一个token的概率分布
+```
+
+#### 2. 推理阶段（Autoregressive）
+
+```
+编码器：一次性编码完整源序列
+     ↓
+解码器：从[BOS]开始逐步生成
+     ↓
+每个时间步：
+  1. 计算注意力权重
+  2. 生成上下文向量  
+  3. 预测下一个token
+  4. 将预测token作为下一步输入
+     ↓
+直到生成[EOS]或达到最大长度
+```
+
+### 数学表达
+
+**注意力计算**：
+$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+
+**其中**：
+- $Q$: 查询矩阵 (decoder_hidden × W_q)
+- $K$: 键矩阵 (encoder_outputs × W_k)  
+- $V$: 值矩阵 (encoder_outputs × W_v)
+- $d_k$: 隐藏层维度
+
+
