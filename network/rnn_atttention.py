@@ -20,6 +20,15 @@ class Attention(nn.Module):
         self.W_q = nn.Linear(hidden_size, hidden_size, bias=False)
         self.W_k = nn.Linear(hidden_size, hidden_size, bias=False)   
         self.W_v = nn.Linear(hidden_size, hidden_size, bias=False)
+        # 说明 Q/K/V 的含义：
+        # - Q (Query)：来自解码器当前的隐藏状态（decoder_hidden），表示解码器在当前时间步的查询向量，
+        #   用来在编码器输出中检索相关信息。形状：[batch_size, hidden_size]
+        # - K (Key)：由编码器在每个时间步的输出经过线性映射得到，表示输入序列中每个位置的键向量。
+        #   形状：[batch_size, seq_len, hidden_size]
+        # - V (Value)：同样由编码器输出映射得到，表示与每个键对应的值向量（用于生成上下文向量）。
+        #   形状：[batch_size, seq_len, hidden_size]
+        # 注意：Q、K、V 通常映射到相同的维度空间，以便计算点积注意力；在 Seq2Seq 解码器中，
+        # Query 通常基于解码器隐藏状态而不是直接基于输入 token 的嵌入，这样注意力可以利用解码历史信息来选择编码器输出。
       
     def forward(self, encoder_outputs, decoder_hidden):
         """
@@ -34,9 +43,11 @@ class Attention(nn.Module):
             attention_weights: [batch_size, seq_len]
         """
         # Compute Q, K, V
+        # Q 从解码器隐藏状态映射而来（不是直接使用输入 token 的嵌入），用于查询编码器的输出序列。
         Q = self.W_q(decoder_hidden).unsqueeze(1)  # [batch_size, 1, hidden_size]
 
-        # 输入是编码器所有时间步的输出
+        # 输入是编码器所有时间步的输出，映射为 K 和 V：
+        # K 用于与 Q 计算相似度（注意力得分），V 用于根据注意力权重加权得到上下文向量。
         K = self.W_k(encoder_outputs)              # [batch_size, seq_len, hidden_size]
         V = self.W_v(encoder_outputs)              # [batch_size, seq_len, hidden_size]
         
