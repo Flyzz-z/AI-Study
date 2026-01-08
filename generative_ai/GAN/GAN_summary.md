@@ -1,5 +1,7 @@
 # GAN 模型总结 (Generative Adversarial Networks)
 
+[GAN介绍](https://zhuanlan.zhihu.com/p/266677860)
+
 ## 1. 核心架构 (Architecture)
 GAN 由两个相互对抗的神经网络组成：
 
